@@ -15,6 +15,7 @@ module Network.Kademlia.Instance
     , insertNode
     , lookupNode
     , dumpPeers
+    , getKClosestNodes
     ) where
 
 import Control.Concurrent
@@ -278,10 +279,15 @@ handleCommand (FIND_VALUE key) peer inst = do
         Nothing    -> returnNodes peer key inst
 handleCommand _ _ _ = return ()
 
--- | Return a KBucket with the closest Nodes to a supplied Id
+-- | Return a KBucket with the closest Nodes to a given Id.
+getKClosestNodes :: (Serialize i) => i -> KademliaInstance i a -> IO [Node i]
+getKClosestNodes id (KI h (KS sTree _) _) = do
+    tree <- atomically . readTVar $ sTree
+    return $ T.findClosest tree id 7
+
+-- | Send a KBucket with the closest Nodes to a supplied Id
 returnNodes :: (Serialize i, Eq i, Ord i, Serialize a) =>
     Peer -> i -> KademliaInstance i a -> IO ()
-returnNodes peer id (KI h (KS sTree _) _) = do
-    tree <- atomically . readTVar $ sTree
-    let nodes = T.findClosest tree id 7
+returnNodes peer id ki@(KI h _ _) = do
+    nodes <- getKClosestNodes id ki
     liftIO $ send h peer (RETURN_NODES id nodes)

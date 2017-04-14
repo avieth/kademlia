@@ -120,6 +120,7 @@ module Network.Kademlia
     , I.lookupNode
     , I.joinNetwork
     , dumpPeers
+    , getKClosestNodes
     , JoinResult(..)
     , Serialize(..)
     , Node(..)
