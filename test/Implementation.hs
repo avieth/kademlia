@@ -72,18 +72,18 @@ idClashCheck idA idB = monadicIO $ do
         entryNode = Node (Peer "127.0.0.1" 1124) idB
 
     joinResult <- run $ do
-        insts@[kiA, _, kiB] <- zipWithM (K.create "127.0.0.1") [1123..] ids
-                            :: IO [KademliaInstance IdType String]
+        insts@[kiA1, _, kiA2] <-
+            zipWithM (K.create "127.0.0.1") [1123..] ids
+            :: IO [KademliaInstance IdType String]
 
-        () <$ K.joinNetwork kiA entryNode
-        joinResult <- K.joinNetwork kiB $ entryNode
+        () <$ K.joinNetwork kiA1 entryNode
+        joinResult <- K.joinNetwork kiA2 $ entryNode
 
         mapM_ K.close insts
 
         return joinResult
 
     assert $ joinResult == K.IDClash
-
 
 -- | Make sure an offline peer is detected
 nodeDownCheck :: Assertion

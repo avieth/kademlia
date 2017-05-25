@@ -160,19 +160,20 @@ joinNetwork inst node = ownId >>= runLookup go inst
           nodeDown = return NodeDown
 
           -- Retrieve your own id
-          ownId = (`usingConfig` config inst) . T.extractId <$>
+          ownId = T.extractId <$>
             (atomically . readTVar .  sTree . state $ inst)
 
           -- Also insert all returned nodes to our bucket (see [CSL-258])
           checkSignal (Signal _ (RETURN_NODES _ _ nodes)) = do
                 -- Check whether the own id was encountered. If so, return a IDClash
                 -- error, otherwise, continue the lookup.
-                -- Commented out due to possibility of bug (like when node reconnects)
-                -- tId <- gets targetId
-                -- case find (\retNode -> nodeId retNode == tId) nodes of
-                --     Just _ -> return IDClash
-                --     _      -> continueLookup nodes sendS continue finish
-                continueLookup nodes sendS continue finish
+                -- NB: if you join the network twice you'll probably find your
+                -- own ID and get an IDClash. That's not a bug, that's misuse:
+                -- you should join the network only once.
+                tId <- gets targetId
+                case find (\retNode -> nodeId retNode == tId) nodes of
+                  Just _ -> return IDClash
+                  _      -> continueLookup nodes sendS continue finish
 
           checkSignal _ = error "Unknow signal for @joinNetwork@"
 
