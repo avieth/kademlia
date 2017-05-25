@@ -93,7 +93,7 @@ instance Binary i => Binary (KademliaSnapshot i)
 newInstance :: (Serialize i) =>
                i -> KademliaConfig -> KademliaHandle i a -> IO (KademliaInstance i a)
 newInstance nid cfg handle = do
-    tree <- atomically $ newTVar (T.create nid `usingConfig` cfg)
+    tree <- atomically $ newTVar (T.create nid)
     banned <- atomically . newTVar $ M.empty
     values <- if storeValues cfg then Just <$> (atomically . newTVar $ M.empty) else pure Nothing
     threads <- atomically . newTVar $ M.empty
@@ -224,11 +224,11 @@ receivingProcess inst@(KI _ h _ _ cfg) rq = forever . (`catch` logError' h) $ do
                 -- This node is not yet known
                 when (not . isJust $ T.lookup tree originId `usingConfig` cfg) $ do
                     let closestKnown = T.findClosest tree originId 1 `usingConfig` cfg
-                    let ownId        = T.extractId tree `usingConfig` cfg
+                    let ownId        = T.extractId tree
                     let self         = node { nodeId = ownId }
                     let bucket       = self:closestKnown
                     -- Find out closest known node
-                    let closestId    = nodeId . head $ sortByDistanceTo bucket originId `usingConfig` cfg
+                    let closestId    = nodeId . head $ sortByDistanceTo bucket originId
 
                     -- This node can be assumed to be closest to the new node
                     when (ownId == closestId) $ do
@@ -400,4 +400,4 @@ restoreInstance cfg handle snapshot = do
     return inst
   where
     emptyInstance = newInstance nid cfg handle
-    nid           = T.extractId (spTree snapshot) `usingConfig` cfg
+    nid           = T.extractId (spTree snapshot)

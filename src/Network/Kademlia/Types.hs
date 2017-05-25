@@ -30,9 +30,6 @@ import           Data.Word               (Word8)
 import           GHC.Generics            (Generic)
 import           Network.Socket          (PortNumber, SockAddr (..), inet_ntoa)
 
-import           Network.Kademlia.Config (WithConfig, getConfig)
-import qualified Network.Kademlia.Config as C
-
 -- | Representation of an UDP peer
 data Peer = Peer {
       peerHost :: String
@@ -58,13 +55,12 @@ instance Show i => Show (Node i) where
 instance Binary i => Binary (Node i)
 
 -- | Sort a bucket by the closeness of its nodes to a give Id
-sortByDistanceTo :: (Serialize i) => [Node i] -> i -> WithConfig [Node i]
-sortByDistanceTo bucket nid = do
-    let pack bk = zip bk <$> sequence (map f bk)
+sortByDistanceTo :: (Serialize i) => [Node i] -> i -> [Node i]
+sortByDistanceTo bucket nid = unpack . sort . pack $ bucket
+  where pack bk = zip bk (map f bk)
         f = distance nid . nodeId
         sort = sortBy (compare `on` snd)
         unpack = map fst
-    unpack . sort <$> pack bucket
 
 -- | A structure serializable into and parsable from a ByteString
 class Serialize a where
@@ -75,33 +71,29 @@ class Serialize a where
 type ByteStruct = [Bool]
 
 -- | Converts a Serialize into a ByteStruct
-toByteStruct :: (Serialize a) => a -> WithConfig ByteStruct
-toByteStruct s = do
-    k <- C.k <$> getConfig
-    let convert w = foldr (\i bits -> testBit w i : bits) [] [0..k]
-    return $ B.foldr (\w bits -> convert w ++ bits) [] $ toBS s
+toByteStruct :: (Serialize a) => a -> ByteStruct
+toByteStruct s = B.foldr (\w bits -> convert w ++ bits) [] $ toBS s
+  where convert w = foldr (\i bits -> testBit w i : bits) [] [0..7]
 
 -- | Convert a ByteStruct back to its ByteString form
-fromByteStruct :: (Serialize a) => ByteStruct -> WithConfig a
-fromByteStruct bs = do
-    k <- C.k <$> getConfig
-    let s = B.pack . foldr (\i ws -> createWord i : ws) [] $ indexes
-        indexes = [0..(length bs `div` (k + 1)) - 1]
-        createWord i = let pos = i * (k + 1)
-                       in foldr changeBit zeroBits [pos..pos + k]
+fromByteStruct :: (Serialize a) => ByteStruct -> a
+fromByteStruct bs = case fromBS s of
+                    (Right (converted, _)) -> converted
+                    (Left err) -> error $ "Failed to convert from ByteStruct: " ++ err
+  where s = B.pack . foldr (\i ws -> createWord i : ws) [] $ indexes
+        indexes = [0..(length bs `div` 8) - 1]
+        createWord i = let pos = i * 8
+                       in foldr changeBit zeroBits [pos..pos + 7]
         changeBit i w = if bs !! i
-              then setBit w (i `mod` (k + 1))
+              then setBit w (i `mod` 8)
               else w
-    case fromBS s of
-        (Right (converted, _)) -> return converted
-        (Left err) -> error $ "Failed to convert from ByteStruct: " ++ err
 
 -- Calculate the distance between two Ids, as specified in the Kademlia paper
-distance :: (Serialize i) => i -> i -> WithConfig ByteStruct
-distance idA idB = do
-    bsA <- toByteStruct idA
-    bsB <- toByteStruct idB
-    return $ zipWith xor bsA bsB
+distance :: (Serialize i) => i -> i -> ByteStruct
+distance idA idB =
+    let bsA = toByteStruct idA
+        bsB = toByteStruct idB
+    in  zipWith xor bsA bsB
   where xor a b = not (a && b) && (a || b)
 
 -- | Try to convert a SockAddr to a Peer

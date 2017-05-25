@@ -66,7 +66,7 @@ lookup inst nid = runLookup go inst nid
                 polled <- gets polled
                 let rest = polled \\ known
                 unless (null rest) $ do
-                    let cachePeer = peer . head $ sortByDistanceTo rest nid `usingConfig` config inst
+                    let cachePeer = peer . head $ sortByDistanceTo rest nid
                     liftIO . send (handle inst) cachePeer . STORE nid $ value
 
                 -- Return the value
@@ -126,7 +126,7 @@ store inst key val = runLookup go inst key
                     peerNum = if length polled > k' then k' else length polled
                     -- Select the peers closest to the key
                     storePeers =
-                        map peer . take peerNum $ sortByDistanceTo polled key `usingConfig` config inst
+                        map peer . take peerNum $ sortByDistanceTo polled key
 
                 -- Send them a STORE command
                 forM_ storePeers $
@@ -347,7 +347,7 @@ continueLookup nodes signalAction continue end = do
     polled  <- gets polled
 
     -- Pick the k closest known nodes, that haven't been polled yet
-    let newKnown = take (k $ config inst) . (`usingConfig` config inst) . flip sortByDistanceTo nid . filter (`notElem` polled)
+    let newKnown = take (k $ config inst) . flip sortByDistanceTo nid . filter (`notElem` polled)
                       $ nodes ++ known
 
     -- Check if k closest nodes have been polled already
@@ -356,7 +356,7 @@ continueLookup nodes signalAction continue end = do
         then do
             -- Send signal to the closest node, that hasn't
             -- been polled yet
-            let next = head $ sortByDistanceTo newKnown nid `usingConfig` config inst
+            let next = head $ sortByDistanceTo newKnown nid
             signalAction next
 
             -- Update known
@@ -383,7 +383,7 @@ continueLookup nodes signalAction continue end = do
             polled <- gets polled
 
             -- Return the k closest nodes, the lookup had contact with
-            return . take (k $ config inst) $ sortByDistanceTo (known ++ polled) cid `usingConfig` config inst
+            return . take (k $ config inst) $ sortByDistanceTo (known ++ polled) cid
 
 -- Send a signal to a node
 sendSignal :: Ord i

@@ -56,7 +56,7 @@ modifyAt :: (Serialize i) =>
             NodeTree i -> i -> NodeTreeFunction i (NodeTreeElem i)
          -> WithConfig (NodeTree i)
 modifyAt (NodeTree idStruct treeElem) nid f = do
-    targetStruct <- toByteStruct nid
+    let targetStruct = toByteStruct nid
     newElems <- go idStruct targetStruct 0 True treeElem
     return $ NodeTree idStruct newElems
   where -- This function is partial, but we know that there will alwasys be a
@@ -81,7 +81,7 @@ bothAt :: (Serialize i) =>
             NodeTree i -> i -> NodeTreeFunction i (NodeTreeElem i, a)
          -> WithConfig (NodeTree i, a)
 bothAt (NodeTree idStruct treeElem) nid f = do
-    targetStruct <- toByteStruct nid
+    let targetStruct = toByteStruct nid
     (newElems, val) <- go idStruct targetStruct 0 True treeElem
     return (NodeTree idStruct newElems, val)
     where -- This function is partial, but we know that there will alwasys be a
@@ -103,7 +103,7 @@ bothAt (NodeTree idStruct treeElem) nid f = do
 -- | Apply a function to the bucket the supplied id would be located in
 applyAt :: (Serialize i) => NodeTree i -> i -> NodeTreeFunction i a -> WithConfig a
 applyAt (NodeTree idStruct treeElem) nid f = do
-    targetStruct <- toByteStruct nid
+    let targetStruct = toByteStruct nid
     go idStruct targetStruct 0 True treeElem
     where -- This function is partial for the same reason as in modifyAt
           --
@@ -118,8 +118,8 @@ applyAt (NodeTree idStruct treeElem) nid f = do
           go _ _ _ _ _ = error "Fundamental error in @go@ function in 'applyAt'"
 
 -- | Create a NodeTree corresponding to the id
-create :: (Serialize i) => i -> WithConfig (NodeTree i)
-create nid = NodeTree <$> (toByteStruct nid) <*> pure (Bucket ([], []))
+create :: (Serialize i) => i -> NodeTree i
+create nid = NodeTree (toByteStruct nid) (Bucket ([], []))
 
 -- | Lookup a node within a NodeTree
 lookup :: (Serialize i, Eq i) => NodeTree i -> i -> WithConfig (Maybe (Node i))
@@ -166,7 +166,7 @@ insert tree node = do
     k <- k <$> getConfig
     cacheSize <- cacheSize <$> getConfig
     let needsSplit depth valid (nodes, _) = do
-          maxDepth <- ((subtract 1) . length <$> toByteStruct (nodeId node))
+          let maxDepth = (subtract 1) . length $ toByteStruct (nodeId node)
           return $
             -- A new node will be inserted
             node `notElem` map fst nodes &&
@@ -209,7 +209,7 @@ split tree splitId = modifyAt tree splitId g
           -- Recursivly split the nodes into two buckets
           splitBucket _ _ []     = return ([], [])
           splitBucket i f (n:ns) = do
-              bs <- toByteStruct . nodeId . f $ n
+              let bs = toByteStruct . nodeId . f $ n
               let bit = bs !! i
               (left, right) <- splitBucket i f ns
               return $ if bit
@@ -240,14 +240,14 @@ findClosest
     -> WithConfig [Node i]
 findClosest (NodeTree idStruct treeElem) nid n = do
     let
-        chooseClosest nodes = take n <$> (sortByDistanceTo nodes $ nid)
+        chooseClosest nodes = take n (sortByDistanceTo nodes nid)
 
         -- This function is partial for the same reason as in modifyAt
         --
         -- Take the n closest nodes
         go _ _ (Bucket (nodes, _))
           | length nodes <= n = return $ map fst nodes
-          | otherwise         = chooseClosest $ map fst nodes
+          | otherwise         = return . chooseClosest $ map fst nodes
         -- Take the closest nodes from the left child first, if those aren't
         -- enough, take the rest from the right
         go (_:is) (False:ts) (Split left right) = do
@@ -264,11 +264,11 @@ findClosest (NodeTree idStruct treeElem) nid n = do
           else (result ++) <$> go is ts left
         go _ _ _ = error "Fundamental error in @go@ function in 'findClosest'"
 
-    targetStruct <- toByteStruct nid
-    chooseClosest =<< go idStruct targetStruct treeElem
+    let targetStruct = toByteStruct nid
+    return . chooseClosest =<< go idStruct targetStruct treeElem
 
 -- Extract original Id from NodeTree
-extractId :: (Serialize i) => NodeTree i -> WithConfig i
+extractId :: (Serialize i) => NodeTree i -> i
 extractId (NodeTree nid _) = fromByteStruct nid
 
 -- | Helper function used for KBucket manipulation

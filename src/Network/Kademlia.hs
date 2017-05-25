@@ -190,7 +190,7 @@ createLFromSnapshot
 createLFromSnapshot host port cfg snapshot logInfo logError = do
     rq <- emptyReplyQueueL logInfo logError
     let lim = msgSizeLimit cfg
-    let id' = T.extractId (spTree snapshot) `usingConfig` cfg
+    let id' = T.extractId (spTree snapshot)
     h <- openOnL host (show port) id' lim rq logInfo logError
     inst <- restoreInstance cfg h snapshot
     start inst rq
