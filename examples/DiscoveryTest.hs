@@ -1,4 +1,5 @@
 import           Control.Arrow             (first)
+import           Control.Concurrent.STM    (readTVarIO)
 import           Control.Monad             (when)
 import           Control.Monad.Random      (Rand, RandomGen, evalRand, evalRandIO,
                                             getRandom)
@@ -9,9 +10,11 @@ import           Data.Binary               (Binary (..), decodeOrFail, encode, g
 import qualified Data.ByteString           as B
 import qualified Data.ByteString.Char8     as C
 import           Data.ByteString.Lazy      (fromStrict, toStrict)
+import           Data.Time.Clock.POSIX     (getPOSIXTime)
 import           GHC.Conc                  (threadDelay)
 import           Network                   (PortNumber)
 import qualified Network.Kademlia          as K
+import qualified Network.Kademlia.Instance as K
 import           System.Environment        (getArgs)
 import           System.Random             (mkStdGen)
 import           System.Random.Shuffle     (shuffleM)
@@ -116,7 +119,9 @@ executeCommand (Dump name) = do
     inct <- ncInstance <$> S.get
     idx <- ncNodeIndex <$> S.get
     bctEdges <- ncBctEdges <$> S.get
-    buckets <- lift $ K.viewBuckets inct
+    tree <- lift $ readTVarIO (K.sTree (K.state inct))
+    timeNow <- lift $ getPOSIXTime
+    let buckets = K.viewBuckets (round timeNow) tree
     ourNode <- K.Node . K.Peer "127.0.0.1" . ncPort <$> S.get <*> (ncKey <$> S.get)
     edges <- lift . fmap concat
                   . mapM (\l -> takeRandom bctEdges l)

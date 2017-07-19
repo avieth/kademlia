@@ -33,7 +33,7 @@ module Network.Kademlia.Instance
 import           Control.Arrow               (second)
 import           Control.Concurrent          (ThreadId)
 import           Control.Concurrent.STM      (TVar, atomically, modifyTVar, newTVar,
-                                              readTVar, readTVarIO, writeTVar)
+                                              readTVar, writeTVar)
 import           Control.Monad               (unless)
 import           Control.Monad.Extra         (unlessM)
 import           Control.Monad.Trans         ()
@@ -197,12 +197,11 @@ restoreInstance extAddr cfg handle snapshot = do
     nid           = T.extractId (spTree snapshot) `usingConfig` cfg
 
 -- | Shows stored buckets, ordered by distance to this node
-viewBuckets :: KademliaInstance i a -> IO [[(Node i, Timestamp)]]
-viewBuckets (KI _ _ (KS sTree _ _) _ _) = do
-    currentTime <- floor <$> getPOSIXTime
-    map (map $ second (currentTime -)) <$> T.toView <$> readTVarIO sTree
+viewBuckets :: Timestamp -> T.NodeTree i -> [[(Node i, Timestamp)]]
+viewBuckets timeNow nTree =
+    map (map $ second (timeNow -)) (T.toView nTree)
 
-peersToNodeIds :: KademliaInstance i a -> [Peer] -> IO [Maybe (Node i)]
-peersToNodeIds (KI _ _ (KS sTree _ _) _ _) peers = do
-    knownPeers <- T.ntPeers <$> atomically (readTVar sTree)
-    pure $ zipWith (fmap . Node) peers $ map (`M.lookup` knownPeers) peers
+peersToNodeIds :: T.NodeTree i -> [Peer] -> [Maybe (Node i)]
+peersToNodeIds nTree peers =
+    let knownPeers = T.ntPeers nTree
+    in  zipWith (fmap . Node) peers $ map (`M.lookup` knownPeers) peers

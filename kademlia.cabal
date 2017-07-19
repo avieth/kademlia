@@ -137,6 +137,8 @@ executable discovery-test
                      , network             >= 2.6 && < 2.7
                      , random
                      , random-shuffle
+                     , stm
+                     , time
                      , transformers        >= 0.3
                      , transformers-compat >= 0.3.3
 
