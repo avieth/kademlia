@@ -28,6 +28,7 @@ module Network.Kademlia.Instance
     , restoreInstance
     , viewBuckets
     , peersToNodeIds
+    , markTimeFrom
     ) where
 
 import           Control.Arrow               (second)
@@ -122,13 +123,14 @@ lookupNodeByPeer (KI _ _ (KS sTree _ _) _ cfg) peer = do
             Nothing  -> Nothing
             Just nid -> T.lookup tree nid `usingConfig` cfg
 
+markTimeFrom :: Timestamp -> [(Node i, Timestamp)] -> [(Node i, Timestamp)]
+markTimeFrom currentTime = map (second (currentTime -))
+
 -- | Return all the Nodes an Instance has encountered so far
 dumpPeers :: KademliaInstance i a -> IO [(Node i, Timestamp)]
-dumpPeers (KI _ _ (KS sTree _ _) _ _) = do
-    currentTime <- floor <$> getPOSIXTime
-    atomically $ do
-        tree <- readTVar sTree
-        return . map (second (currentTime -)) . T.toList $ tree
+dumpPeers (KI _ _ (KS sTree _ _) _ _) = atomically $ do
+    tree <- readTVar sTree
+    return . T.toList $ tree
 
 -- | Insert a value into the store
 insertValue :: (Ord i) => i -> a -> KademliaInstance i a -> IO ()
@@ -197,9 +199,8 @@ restoreInstance extAddr cfg handle snapshot = do
     nid           = T.extractId (spTree snapshot) `usingConfig` cfg
 
 -- | Shows stored buckets, ordered by distance to this node
-viewBuckets :: Timestamp -> T.NodeTree i -> [[(Node i, Timestamp)]]
-viewBuckets timeNow nTree =
-    map (map $ second (timeNow -)) (T.toView nTree)
+viewBuckets :: T.NodeTree i -> [[(Node i, Timestamp)]]
+viewBuckets nTree = T.toView nTree
 
 peersToNodeIds :: T.NodeTree i -> [Peer] -> [Maybe (Node i)]
 peersToNodeIds nTree peers =

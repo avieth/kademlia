@@ -120,8 +120,8 @@ executeCommand (Dump name) = do
     idx <- ncNodeIndex <$> S.get
     bctEdges <- ncBctEdges <$> S.get
     tree <- lift $ readTVarIO (K.sTree (K.state inct))
-    timeNow <- lift $ getPOSIXTime
-    let buckets = K.viewBuckets (round timeNow) tree
+    currentTime <- floor <$> lift getPOSIXTime
+    let buckets = map (K.markTimeFrom currentTime) (K.viewBuckets tree)
     ourNode <- K.Node . K.Peer "127.0.0.1" . ncPort <$> S.get <*> (ncKey <$> S.get)
     edges <- lift . fmap concat
                   . mapM (\l -> takeRandom bctEdges l)
